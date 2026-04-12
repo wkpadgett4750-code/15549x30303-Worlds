@@ -4,10 +4,9 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import org.firstinspires.ftc.teamcode.ShooterSubsystem;
 
 @TeleOp(name = "FlywheelAndIntakeTest")
-public class FLywheelAndIntakeTest extends LinearOpMode {
+public class FlywheelAndIntakeTest extends LinearOpMode {
 
     ShooterSubsystem shooter;
 
@@ -40,7 +39,7 @@ public class FLywheelAndIntakeTest extends LinearOpMode {
             // FLYWHEEL CONTROL (Triggers)
             // -----------------------------
             if (gamepad1.left_trigger > 0.1) {
-                shooter.setFlywheelVelocity(2000, true);   // ENCODER velocity mode
+                shooter.setFlywheelVelocity(1500, true);   // ENCODER velocity mode
             }
 
             if (gamepad1.right_trigger > 0.1) {
