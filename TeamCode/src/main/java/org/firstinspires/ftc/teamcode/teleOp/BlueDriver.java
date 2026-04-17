@@ -1,5 +1,6 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.teleOp;
 
+import com.pedropathing.math.Vector;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -7,6 +8,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 
 @TeleOp(name="BlueDriver", group="Linear Opmode")
 public class BlueDriver extends LinearOpMode {
@@ -18,8 +21,9 @@ public class BlueDriver extends LinearOpMode {
     DcMotor leftFront, rightFront, leftBack, rightBack;
 
     // Added WAIT_FOR_GATE to the state machine
-    enum ShotState { IDLE, OPEN_GATE, WAIT_FOR_GATE, RUN_INTAKE, CLOSE_GATE }
+    enum ShotState { IDLE, WAIT_FOR_GATE, RUN_INTAKE, CLOSE_GATE }
     ShotState currentShotState = ShotState.IDLE;
+    ElapsedTime manualOnTimer = new ElapsedTime();
     ElapsedTime shotTimer = new ElapsedTime();
 
     ElapsedTime breakTimer = new ElapsedTime();
@@ -62,6 +66,9 @@ public class BlueDriver extends LinearOpMode {
             follower.update();
             Pose currentPose = follower.getPose();
 
+            // Get the current velocity vector from Pedro Pathing for SOTM
+            Vector currentVelocity = follower.getVelocity();
+
             // 1. DRIVING
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
@@ -82,86 +89,87 @@ public class BlueDriver extends LinearOpMode {
             lastLB = gamepad1.left_bumper;
             lastRB = gamepad1.right_bumper;
 
-            shooter.alignTurret(currentPose.getX(), currentPose.getY(), currentPose.getHeading(), true, telemetry, 0, false);
+            // Updated alignTurret call injecting X and Y velocities
+            shooter.alignTurret(
+                    currentPose.getX(),
+                    currentPose.getY(),
+                    currentPose.getHeading(),
+                    currentVelocity.getXComponent(),
+                    currentVelocity.getYComponent(),
+                    true,
+                    telemetry,
+                    0,
+                    false
+            );
 
-            // 3. INTAKE LOGIC (With Right Trigger Toggle)
+// 3. INTAKE LOGIC (MANUAL TOGGLE ON RIGHT TRIGGER)
             boolean rtPressed = gamepad1.right_trigger > 0.5;
             if (rtPressed && !lastRT) {
-                intakeDisabledManually = !intakeDisabledManually; // Flip the switch
+                intakeDisabledManually = !intakeDisabledManually;
+
+                if (intakeDisabledManually) {
+                    intake.intakeOff();
+                    shooter.openGate();
+                } else {
+                    shooter.closeGate();
+                    manualOnTimer.reset();
+                }
             }
             lastRT = rtPressed;
 
             boolean isCurrentlyBroken = intake.isFull();
+
             if (currentShotState == ShotState.IDLE) {
                 if (intakeDisabledManually) {
-                    intake.intakeOff();
+                    intake.intakeOff(); // Gate is already open from the toggle logic above
                 }
-
+                else if (manualOnTimer.seconds() < 0.5) {
+                    intake.intakeOff(); // Wait for gate to close
+                }
                 else if (isCurrentlyBroken) {
+                    // Auto-Stop Sequence
                     if (!beamWasBroken) {
                         breakTimer.reset();
                         beamWasBroken = true;
                     }
-
-                    // Phase 1: Stop the intake after 0.4s of continuous blockage
-                    if (breakTimer.seconds() >= 0.4 && !intakeAutoStopped) {
+                    if (breakTimer.seconds() >= 0.3 && !intakeAutoStopped) {
                         intake.intakeOff();
                         intakeAutoStopped = true;
                     }
-
-                    // Phase 2: Wait an additional 0.5s AFTER the intake stops to open the gate
-                    // (Total time from first break: 0.4s + 0.5s = 0.9s)
-                    if (breakTimer.seconds() >= 0.9 && intakeAutoStopped) {
+                    if (breakTimer.seconds() >= 0.4 && intakeAutoStopped) {
                         shooter.openGate();
                     }
                 }
                 else {
-                    // Reset everything if the beam is cleared
                     intake.intakeFull();
                     beamWasBroken = false;
                     intakeAutoStopped = false;
-                    // Optionally close the gate here if you want it to auto-shut when empty
-                    // shooter.closeGate();
                 }
             }
 
-            // 4. SHOT SEQUENCE (Left Trigger Fire with .5s Delays)
-            if (gamepad1.left_trigger > 0.1 && currentShotState == ShotState.IDLE) {
-                currentShotState = ShotState.OPEN_GATE;
+            // 4. SHOT SEQUENCE (ON LEFT TRIGGER)
+            if (gamepad1.left_trigger > 0.5 && currentShotState == ShotState.IDLE) {
+                currentShotState = ShotState.WAIT_FOR_GATE;
                 shotTimer.reset();
             }
 
             switch (currentShotState) {
-                case OPEN_GATE:
-                    intake.intakeOff();
-                    if (shotTimer.seconds() >= 0.5) {
-                        shooter.openGate();
-                        shotTimer.reset();
-                        currentShotState = ShotState.WAIT_FOR_GATE;
-                    }
-                    break;
-
                 case WAIT_FOR_GATE:
-                    // Pause for .5s to let the gate fully move
-                    if (shotTimer.seconds() >= 0.5) {
-                        intake.intakeCustom(); // Turn on intake after delay
+                    if (shotTimer.seconds() >= 0.05) {
+                        intake.intakeCustom();
                         shotTimer.reset();
                         currentShotState = ShotState.RUN_INTAKE;
                     }
                     break;
-
                 case RUN_INTAKE:
-                    // Keep intake running for .5s to push ring through
-                    if (shotTimer.seconds() >= 0.5) {
+                    if (shotTimer.seconds() >= 0.4) {
                         intake.intakeOff();
                         shotTimer.reset();
                         currentShotState = ShotState.CLOSE_GATE;
                     }
                     break;
-
                 case CLOSE_GATE:
-                    // Keep gate open for an extra .5s after intake stops as requested
-                    if (shotTimer.seconds() >= 0.5) {
+                    if (shotTimer.seconds() >= 0.3) {
                         shooter.closeGate();
                         currentShotState = ShotState.IDLE;
                         intakeAutoStopped = false;
