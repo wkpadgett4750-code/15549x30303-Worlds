@@ -17,15 +17,15 @@ public class DashboardTuner extends LinearOpMode {
     ShooterSubsystem shooter;
     IntakeSubsystem intake;
     Follower follower;
-
     DcMotor leftFront, rightFront, leftBack, rightBack;
 
     public static boolean RUN_TRACKING = false;
-    public static boolean USE_MANUAL_TICKS = false; // New toggle for static PID testing
+    public static boolean USE_DASHBOARD_CTRL = true;
     public static boolean RUN_FLYWHEELS = false;
     public static boolean RUN_INTAKE = false;
 
     private boolean lastA = false, lastB = false, lastX = false, lastY = false;
+    private boolean lastUp = false, lastDown = false;
 
     @Override
     public void runOpMode() {
@@ -47,10 +47,10 @@ public class DashboardTuner extends LinearOpMode {
             follower.update();
             Pose cp = follower.getPose();
 
-            // 1. DRIVING
-            double driveY = -gamepad1.left_stick_y;
-            double driveX = gamepad1.left_stick_x * 1.1;
-            double rx = gamepad1.right_stick_x;
+            // 1. CHASSIS DRIVE (Half power for easier tuning)
+            double driveY = -gamepad1.left_stick_y * 0.5;
+            double driveX = gamepad1.left_stick_x * 0.55;
+            double rx = gamepad1.right_stick_x * 0.5;
             double den = Math.max(Math.abs(driveY) + Math.abs(driveX) + Math.abs(rx), 1);
             leftFront.setPower((driveY + driveX + rx) / den);
             leftBack.setPower((driveY - driveX + rx) / den);
@@ -61,31 +61,37 @@ public class DashboardTuner extends LinearOpMode {
             if (gamepad1.a && !lastA) RUN_TRACKING = !RUN_TRACKING;
             lastA = gamepad1.a;
 
-            if (gamepad1.b && !lastB) RUN_INTAKE = !RUN_INTAKE;
-            lastB = gamepad1.b;
-
             if (gamepad1.x && !lastX) RUN_FLYWHEELS = !RUN_FLYWHEELS;
             lastX = gamepad1.x;
 
-            if (gamepad1.y && !lastY) USE_MANUAL_TICKS = !USE_MANUAL_TICKS;
+            if (gamepad1.y && !lastY) {
+                USE_DASHBOARD_CTRL = !USE_DASHBOARD_CTRL;
+                shooter.stopTurret(); // Reset the "currentCommandedPos" to current spot
+            }
             lastY = gamepad1.y;
 
-            // 3. TURRET AIMING
+            // 3. MANUAL TRIM (D-Pad Up/Down)
+            if (gamepad1.dpad_up && !lastUp) shooter.trimDegrees += 0.5;
+            lastUp = gamepad1.dpad_up;
+            if (gamepad1.dpad_down && !lastDown) shooter.trimDegrees -= 0.5;
+            lastDown = gamepad1.dpad_down;
+
+            // 4. TURRET CONTROL
             if (RUN_TRACKING) {
                 shooter.trackingActive = true;
-                if (USE_MANUAL_TICKS) {
-                    // Manually move the turret to a specific tick count via Dashboard
-                    shooter.setTurretPosition(ShooterSubsystem.tuningTurretTicks);
+                ShooterSubsystem.USE_MANUAL_SERVO = USE_DASHBOARD_CTRL;
+
+                if (USE_DASHBOARD_CTRL) {
+                    shooter.setTurretPosition(ShooterSubsystem.tuningTargetDegrees);
                 } else {
-                    // STATIC TRACKING: Passing 0 for vx and vy ignores "Shooting on the Move"
-                    // This just points at the goal from where the robot is currently sitting.
-                  //  shooter.alignTurret(cp.getX(), cp.getY(), cp.getHeading(), 0, 0, true, null, 0, false);
+                    // Full Auto Align
+                    shooter.alignTurret(cp.getX(), cp.getY(), cp.getHeading(), true, telemetry, 0, false);
                 }
             } else {
                 shooter.stopTurret();
             }
 
-            // 4. FLYWHEELS & HOOD
+            // 5. FLYWHEELS
             if (RUN_FLYWHEELS) {
                 shooter.setFlywheelVelocity(ShooterSubsystem.tuningRPM);
                 shooter.setHoodPosition(ShooterSubsystem.tuningHoodPos);
@@ -93,27 +99,15 @@ public class DashboardTuner extends LinearOpMode {
                 shooter.disableFlywheels();
             }
 
-            // 5. INTAKE
-            if (RUN_INTAKE) intake.farShot();
-            else intake.intakeOff();
-// --- CALCULATE DISTANCE ---
-            double distToGoal = Math.hypot(ShooterSubsystem.blueGoalX - cp.getX(), ShooterSubsystem.blueGoalY - cp.getY());
             // 6. TELEMETRY
-            telemetry.addLine("--- SYSTEM STATUS ---");
-            telemetry.addData("Mode", USE_MANUAL_TICKS ? "MANUAL TICKS" : "GOAL TRACKING");
-            telemetry.addData("Distance from Goal", "%.2f in", distToGoal);
-
-            telemetry.addLine("\n--- SHOOTER ---");
-            telemetry.addData("Hood Position", ShooterSubsystem.tuningHoodPos);
-            telemetry.addData("Target Velocity", ShooterSubsystem.tuningRPM);
-            telemetry.addData("Actual Velocity", shooter.getCurrentVelocity());
+            telemetry.addLine("--- CONTROLS ---");
+            telemetry.addData("A", "Toggle Tracking (" + (RUN_TRACKING ? "ON" : "OFF") + ")");
+            telemetry.addData("Y", "Mode: " + (USE_DASHBOARD_CTRL ? "SLIDER" : "AUTO"));
+            telemetry.addData("D-Pad", "Trim: " + shooter.trimDegrees + "°");
 
             telemetry.addLine("\n--- TURRET ---");
-            telemetry.addData("Turret Target Pos", USE_MANUAL_TICKS ? ShooterSubsystem.tuningTurretTicks : "AUTO-CALC");
-            telemetry.addData("Turret Actual Pos", shooter.getTurretPos());
-
-            telemetry.addLine("\n--- LOCALIZATION ---");
-            telemetry.addData("Robot Pose", "X: %.2f, Y: %.2f, H: %.2f", cp.getX(), cp.getY(), Math.toDegrees(cp.getHeading()));
+            telemetry.addData("Target Deg", USE_DASHBOARD_CTRL ? ShooterSubsystem.tuningTargetDegrees : "AUTO");
+            telemetry.addData("Slew Limit", ShooterSubsystem.MAX_SERVO_STEP);
 
             telemetry.update();
         }

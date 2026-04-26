@@ -11,7 +11,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class IntakeSubsystem {
 
     // Intake power settings
-    public static double closeSpeed = .68;
+    public static double closeSpeed = .63;
+
+    public static double autoSpeed = .62;
     public static double farSpeed = .48;
     public static double INTAKE_POWER = 1.0;
 
@@ -65,6 +67,11 @@ public class IntakeSubsystem {
     public void intakeOff() {
         intake.setPower(0);
         transfer.setPower(0);
+    }
+
+    public void autoShot() {
+        intake.setPower(autoSpeed);
+        transfer.setPower(autoSpeed);
     }
 
     public void intakeReverse() {

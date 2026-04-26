@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.teleOp;
 
 import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.BLUE_RESET;
 import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.CLOSE_BLUE;
+import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.CLOSE_RED;
+import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.RED_RESET;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -14,8 +16,8 @@ import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.PoseStorage;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 
-@TeleOp(name="BlueDriver", group="Linear Opmode")
-public class BlueDriver extends LinearOpMode {
+@TeleOp(name="RedDriver", group="Linear Opmode")
+public class RedDriver extends LinearOpMode {
 
     // Controller 2 State Tracking
     private boolean autoAlignEnabled = true; // Start in Auto
@@ -39,7 +41,7 @@ public class BlueDriver extends LinearOpMode {
     boolean intakeDisabledManually = false;
     boolean lastRT = false;
 
-    private Pose startPose = new Pose(7.7, 8.1, Math.toRadians(0));
+    private Pose startPose = new Pose(7.7, 8.1, Math.toRadians(180));
     private boolean lastLB = false;
     private boolean lastRB = false;
     // Define your "Home" position for recalibration (adjust these coordinates!)
@@ -47,13 +49,15 @@ public class BlueDriver extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        // --- SMART POSE RECOVERY ---
+        follower = Constants.createFollower(hardwareMap);
+        // --- THE FAILSAFE LOGIC ---
         if (PoseStorage.currentPose != null) {
-            // Use the exact spot the Auto left the robot
+            // 1. Success! Load the exact pose from Auto
             follower.setStartingPose(PoseStorage.currentPose);
         } else {
-            // Auto failed or didn't run? Use the default for this side
-            follower.setStartingPose(PoseStorage.getFailsafePose(PoseStorage.AutoRoute.CLOSE_BLUE));
+            // 2. Failsafe: Auto didn't run or save.
+            // Load the default for this specific TeleOp/Side.
+            follower.setStartingPose(PoseStorage.getFailsafePose(CLOSE_RED));
         }
 
         shooter = new ShooterSubsystem(hardwareMap);
@@ -78,7 +82,7 @@ public class BlueDriver extends LinearOpMode {
         while (opModeIsActive()) {
             follower.update();
             Pose currentPose = follower.getPose();
-            double distToGoal = Math.hypot(ShooterSubsystem.blueGoalX - currentPose.getX(), ShooterSubsystem.blueGoalY - currentPose.getY());
+            double distToGoal = Math.hypot(ShooterSubsystem.redGoalX - currentPose.getX(), ShooterSubsystem.redGoalY - currentPose.getY());
 
             // 1. CHASSIS DRIVE (GP1)
             double y = -gamepad1.left_stick_y;
@@ -115,15 +119,15 @@ public class BlueDriver extends LinearOpMode {
 
                 // 2. RECALIBRATION BUTTON COMBO (GP2)
                 // Start + Back is the standard safety combo
-                if (gamepad1.y) {
-                    follower.setPose(PoseStorage.getFailsafePose(BLUE_RESET));
+                if (gamepad2.start && gamepad2.back) {
+                    follower.setPose(PoseStorage.getFailsafePose(RED_RESET));
                     gamepad2.rumble(300);
                 }
-                    // Helpful Telemetry for the drivers
-                    telemetry.addData("X", currentPose.getX());
-                    telemetry.addData("Y", currentPose.getY());
-                    telemetry.addData("Heading", Math.toDegrees(currentPose.getHeading()));
-                    telemetry.update();
+                // Helpful Telemetry for the drivers
+                telemetry.addData("X", currentPose.getX());
+                telemetry.addData("Y", currentPose.getY());
+                telemetry.addData("Heading", Math.toDegrees(currentPose.getHeading()));
+                telemetry.update();
             }
 
             // 4. TRIM & FLYWHEEL CONTROL (GP1)
