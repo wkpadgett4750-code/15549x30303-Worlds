@@ -17,9 +17,9 @@ import org.firstinspires.ftc.teamcode.subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.PoseStorage;
 import org.firstinspires.ftc.teamcode.subsystems.ShooterSubsystem;
 
-@Autonomous(name = "BottomBlue21", group = "Autonomous")
+@Autonomous(name = "Red18", group = "Autonomous")
 @Configurable
-public class BottomBlue21 extends OpMode {
+public class Red18 extends OpMode {
     private TelemetryManager panelsTelemetry;
     public Follower follower;
 
@@ -31,9 +31,8 @@ public class BottomBlue21 extends OpMode {
     private Paths paths;
     private int gateCycles = 0;
 
-    // --- NEW DEGREE-BASED TURRET TARGET ---
-    // Set this to 90 or -90 to match your manual buttons
-    public static double turretTargetDegrees = -95.0;
+    // --- TURRET TARGET (Adjusted for Red Side) ---
+    public static double turretTargetDegrees = 90.0;
 
     // --- STATE TIMERS & FLAGS ---
     enum ShotState { IDLE, OPEN_GATE, RUN_INTAKE, CLOSE_GATE, COOLDOWN }
@@ -49,8 +48,11 @@ public class BottomBlue21 extends OpMode {
         panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(18.1, 124.5, Math.toRadians(-36)));
-        PoseStorage.currentPose = follower.getPose();
+        // Start Pose matches the beginning of PreLoadShot
+        follower.setStartingPose(new Pose(125.9, 119.5, Math.toRadians(216)));
+
+        // Handshake for TeleOp failsafes
+
 
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
@@ -58,7 +60,7 @@ public class BottomBlue21 extends OpMode {
         shooter.closeGate();
         paths = new Paths(follower);
 
-        panelsTelemetry.debug("Status", "Initialized");
+        panelsTelemetry.debug("Status", "Red18 Initialized");
         panelsTelemetry.update(telemetry);
     }
 
@@ -74,19 +76,17 @@ public class BottomBlue21 extends OpMode {
         PoseStorage.currentPose = follower.getPose();
 
 
-        // 1. CALCULATE DISTANCE
-        double distToGoal = Math.hypot(ShooterSubsystem.blueGoalX - cp.getX(), ShooterSubsystem.blueGoalY - cp.getY());
+        // 1. CALCULATE DISTANCE (Using Red Goal)
+        double distToGoal = Math.hypot(ShooterSubsystem.redGoalX - cp.getX(), ShooterSubsystem.redGoalY - cp.getY());
 
-        // 2. UPDATED TURRET LOGIC
-        // We use the same setTurretPosition call from your TeleOp.
-        // This keeps it at a fixed 90-degree offset throughout the auto.
+        // 2. TURRET CONTROL
         shooter.setTurretPosition(turretTargetDegrees);
 
-        // 3. CONTINUOUS SHOOTER ADJUSTMENT
+        // 3. SHOOTER INTERPOLATION
         shooter.setFlywheelVelocity(shooter.interpolate(distToGoal, ShooterSubsystem.distances, ShooterSubsystem.rpms), true);
         shooter.setHoodPosition(shooter.interpolate(distToGoal, ShooterSubsystem.distances, ShooterSubsystem.hoods));
 
-        // 4. BACKGROUND AUTO-INTAKE
+        // 4. BACKGROUND INTAKE
         boolean isCurrentlyBroken = intake.isFull();
         if (currentShotState == ShotState.IDLE) {
             if (isCurrentlyBroken) {
@@ -99,7 +99,19 @@ public class BottomBlue21 extends OpMode {
             }
         }
 
-        // 5. SHOT SEQUENCE STATE MACHINE
+        // 5. SHOT SEQUENCE
+        updateShotSequence(distToGoal);
+
+        // 6. PATHING
+        autonomousPathUpdate();
+
+        panelsTelemetry.debug("Path State", pathState);
+        panelsTelemetry.debug("X", cp.getX());
+        panelsTelemetry.debug("Y", cp.getY());
+        panelsTelemetry.update(telemetry);
+    }
+
+    private void updateShotSequence(double distToGoal) {
         switch (currentShotState) {
             case OPEN_GATE:
                 if (shotTimer.seconds() >= 0.05) {
@@ -123,14 +135,6 @@ public class BottomBlue21 extends OpMode {
                 }
                 break;
         }
-
-        // 6. PATHING STATE MACHINE
-        autonomousPathUpdate();
-
-        panelsTelemetry.debug("Path State", pathState);
-        panelsTelemetry.debug("Turret Angle", turretTargetDegrees);
-        panelsTelemetry.debug("Shot State", currentShotState);
-        panelsTelemetry.update(telemetry);
     }
 
     private void triggerShot() {
@@ -147,7 +151,6 @@ public class BottomBlue21 extends OpMode {
                 follower.followPath(paths.PreLoadShot);
                 pathState = 15;
                 break;
-
             case 15:
                 if (!follower.isBusy()) { triggerShot(); pathState = 2; }
                 break;
@@ -170,7 +173,7 @@ public class BottomBlue21 extends OpMode {
                 if (!follower.isBusy()) { spinUpTimer.reset(); pathState = 16; }
                 break;
             case 16:
-                if (spinUpTimer.seconds() >= .9) { follower.followPath(paths.GateShot); pathState = 7; }
+                if (spinUpTimer.seconds() >= 0.65) { follower.followPath(paths.GateShot); pathState = 7; }
                 break;
             case 7:
                 if (!follower.isBusy()) { triggerShot(); pathState = 8; }
@@ -184,8 +187,7 @@ public class BottomBlue21 extends OpMode {
                 break;
             case 9:
                 if (!follower.isBusy()) {
-                    // You can even update the turret target mid-auto!
-                    turretTargetDegrees = -70.0;
+                    turretTargetDegrees = 70.0;
                     follower.followPath(paths.ShootSpike1);
                     pathState = 10;
                 }
@@ -195,7 +197,6 @@ public class BottomBlue21 extends OpMode {
                 break;
             case 11:
                 if (currentShotState == ShotState.IDLE) {
-                    PoseStorage.currentPose = follower.getPose();
                     pathState = -1;
                 }
                 break;
@@ -207,71 +208,70 @@ public class BottomBlue21 extends OpMode {
         public Paths(Follower follower) {
             PreLoadShot = follower.pathBuilder().addPath(
                             new BezierCurve(
-                                    new Pose(18.100, 119.500),
-                                    new Pose(41.154, 101.158),
-                                    new Pose(55.850, 85.907)
+                                    new Pose(125.900, 119.500),
+                                    new Pose(102.846, 101.158),
+                                    new Pose(88.150, 85.907)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-36), Math.toRadians(-135))
+                    ).setLinearHeadingInterpolation(Math.toRadians(216), Math.toRadians(315))
                     .build();
 
             IntakeSpike2 = follower.pathBuilder().addPath(
                             new BezierCurve(
-                                    new Pose(55.850, 85.907),
-                                    new Pose(51.079, 58.463),
-                                    new Pose(12.065, 64.056)
+                                    new Pose(88.150, 85.907),
+                                    new Pose(92.921, 58.463),
+                                    new Pose(131.935, 63.056)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-135), Math.toRadians(-180))
+                    ).setLinearHeadingInterpolation(Math.toRadians(315), Math.toRadians(360))
                     .build();
 
             ShootSpike2 = follower.pathBuilder().addPath(
                             new BezierCurve(
-                                    new Pose(12.065, 63.056),
-                                    new Pose(50.290, 68.664),
-                                    new Pose(56.290, 86.178)
+                                    new Pose(131.935, 63.056),
+                                    new Pose(93.710, 68.664),
+                                    new Pose(87.710, 86.178)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-135))
+                    ).setLinearHeadingInterpolation(Math.toRadians(360), Math.toRadians(315))
                     .build();
 
             GateTake = follower.pathBuilder().addPath(
                             new BezierCurve(
-                                    new Pose(56.290, 86.178),
-                                    new Pose(46.495, 75.005),
-                                    new Pose(8.51, 63.139)
+                                    new Pose(87.710, 86.178),
+                                    new Pose(101.505, 69.005),
+                                    new Pose(135.336, 61.439)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-135), Math.toRadians(-215))
+                    ).setLinearHeadingInterpolation(Math.toRadians(315), Math.toRadians(390))
                     .build();
 
             GateShot = follower.pathBuilder().addPath(
                             new BezierCurve(
-                                    new Pose(8.664, 59.439),
-                                    new Pose(39.500, 62.374),
-                                    new Pose(55.981, 86.131)
+                                    new Pose(135.336, 59.439),
+                                    new Pose(104.500, 62.374),
+                                    new Pose(88.019, 86.131)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-210), Math.toRadians(-135))
+                    ).setLinearHeadingInterpolation(Math.toRadians(390), Math.toRadians(315))
                     .build();
 
             IntakeSpike1 = follower.pathBuilder().addPath(
                             new BezierLine(
-                                    new Pose(55.981, 86.131),
-                                    new Pose(15.252, 85.458)
+                                    new Pose(88.019, 86.131),
+                                    new Pose(128.748, 85.458)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-155), Math.toRadians(-180))
+                    ).setLinearHeadingInterpolation(Math.toRadians(335), Math.toRadians(360))
                     .build();
 
             ShootSpike1 = follower.pathBuilder().addPath(
                             new BezierLine(
-                                    new Pose(15.252, 85.458),
-                                    new Pose(49.748, 115.673)
+                                    new Pose(128.748, 85.458),
+                                    new Pose(94.252, 115.673)
                             )
-                    ).setLinearHeadingInterpolation(Math.toRadians(-180), Math.toRadians(-90))
+                    ).setLinearHeadingInterpolation(Math.toRadians(360), Math.toRadians(270))
                     .build();
-
         }
-
     }
+
     @Override
     public void stop() {
-        // This is the "Safety Net" that saves the pose no matter what
+        // Save the final pose for RedDriver
         PoseStorage.currentPose = follower.getPose();
     }
 }

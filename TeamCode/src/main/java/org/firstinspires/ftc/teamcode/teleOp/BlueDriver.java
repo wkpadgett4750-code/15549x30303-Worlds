@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.teleOp;
 
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.BLUE_RESET;
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.CLOSE_BLUE;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -39,7 +37,6 @@ public class BlueDriver extends LinearOpMode {
     boolean intakeDisabledManually = false;
     boolean lastRT = false;
 
-    private Pose startPose = new Pose(7.7, 8.1, Math.toRadians(0));
     private boolean lastLB = false;
     private boolean lastRB = false;
     // Define your "Home" position for recalibration (adjust these coordinates!)
@@ -48,14 +45,8 @@ public class BlueDriver extends LinearOpMode {
     @Override
     public void runOpMode() {
         // --- SMART POSE RECOVERY ---
-        if (PoseStorage.currentPose != null) {
-            // Use the exact spot the Auto left the robot
-            follower.setStartingPose(PoseStorage.currentPose);
-        } else {
-            // Auto failed or didn't run? Use the default for this side
-            follower.setStartingPose(PoseStorage.getFailsafePose(PoseStorage.AutoRoute.CLOSE_BLUE));
-        }
 
+        follower = Constants.createFollower(hardwareMap);
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
 
@@ -73,6 +64,7 @@ public class BlueDriver extends LinearOpMode {
         rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         shooter.closeGate();
+        follower.setStartingPose(PoseStorage.currentPose);
         waitForStart();
 
         while (opModeIsActive()) {
@@ -115,17 +107,17 @@ public class BlueDriver extends LinearOpMode {
 
                 // 2. RECALIBRATION BUTTON COMBO (GP2)
                 // Start + Back is the standard safety combo
-                if (gamepad1.y) {
-                    follower.setPose(PoseStorage.getFailsafePose(BLUE_RESET));
-                    gamepad2.rumble(300);
-                }
+
                     // Helpful Telemetry for the drivers
                     telemetry.addData("X", currentPose.getX());
                     telemetry.addData("Y", currentPose.getY());
                     telemetry.addData("Heading", Math.toDegrees(currentPose.getHeading()));
                     telemetry.update();
             }
-
+            if (gamepad1.y) {
+                follower.setPose(new Pose(136.3,8.1,180));
+                gamepad2.rumble(300);
+            }
             // 4. TRIM & FLYWHEEL CONTROL (GP1)
             if (gamepad1.left_bumper && !lastLB)  shooter.trimDegrees -= 1.0;
             if (gamepad1.right_bumper && !lastRB) shooter.trimDegrees += 1.0;

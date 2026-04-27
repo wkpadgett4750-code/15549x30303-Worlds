@@ -17,13 +17,13 @@ public class ShooterSubsystem {
     private VoltageSensor batteryVoltageSensor;
 
     // --- LUT DATA ---
-    public static double[] distances = {42.08, 53.03, 64.34, 67.62, 69.52, 74.42, 84.0, 93.5, 102.94, 113.7, 130, 150.86, 154.53, 160.19};
-    public static double[] rpms      = {1290, 1300, 1470, 1550, 1550, 1600, 1660, 1700, 1740, 1770, 1800, 1950, 1960, 1980};
-    public static double[] hoods     = {0.70, 0.645, 0.585, 0.56, 0.55, 0.535, 0.525, 0.515, 0.51, 0.505, .505, 0.52, 0.52, 0.52};
+    public static double[] distances = {42.08, 53.03, 64.34, 67.62, 69.52, 74.42, 80, 84.0, 93.5, 102.94, 113.7, 130, 150.86, 154.53, 160.19};
+    public static double[] rpms      = {1290, 1300, 1470, 1550, 1550, 1600, 1650, 1660, 1700, 1740, 1770, 1800, 1950, 1960, 1980};
+    public static double[] hoods     = {0.70, 0.645, 0.585, 0.56, 0.55, 0.5375, .535, 0.5275, 0.515, 0.51, 0.505, .505, 0.52, 0.52, 0.52};
 
     // --- TURRET ALIGNMENT CONSTANTS ---
     public static double blueGoalX = 0.0, blueGoalY = 144.0;
-    public static double redGoalX = 0.0, redGoalY = -144.0;
+    public static double redGoalX = 144.0, redGoalY = 144.0;
     public static double angleOffset = -90.0;
     public static double turretOffsetX = 1.5, turretOffsetY = 0.0;
 

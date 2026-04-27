@@ -1,10 +1,5 @@
 package org.firstinspires.ftc.teamcode.teleOp;
 
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.BLUE_RESET;
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.CLOSE_BLUE;
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.CLOSE_RED;
-import static org.firstinspires.ftc.teamcode.subsystems.PoseStorage.AutoRoute.RED_RESET;
-
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -50,15 +45,7 @@ public class RedDriver extends LinearOpMode {
     @Override
     public void runOpMode() {
         follower = Constants.createFollower(hardwareMap);
-        // --- THE FAILSAFE LOGIC ---
-        if (PoseStorage.currentPose != null) {
-            // 1. Success! Load the exact pose from Auto
-            follower.setStartingPose(PoseStorage.currentPose);
-        } else {
-            // 2. Failsafe: Auto didn't run or save.
-            // Load the default for this specific TeleOp/Side.
-            follower.setStartingPose(PoseStorage.getFailsafePose(CLOSE_RED));
-        }
+
 
         shooter = new ShooterSubsystem(hardwareMap);
         intake = new IntakeSubsystem(hardwareMap);
@@ -77,6 +64,7 @@ public class RedDriver extends LinearOpMode {
         rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         shooter.closeGate();
+        follower.setStartingPose(PoseStorage.currentPose);
         waitForStart();
 
         while (opModeIsActive()) {
@@ -108,7 +96,7 @@ public class RedDriver extends LinearOpMode {
                 if (gamepad1.a) { shooter.trackingActive = true; shooter.enableFlywheels(); }
                 if (gamepad1.b) { shooter.trackingActive = false; shooter.disableFlywheels(); }
 
-                shooter.alignTurret(currentPose.getX(), currentPose.getY(), currentPose.getHeading(), true, telemetry, 0, false);
+                shooter.alignTurret(currentPose.getX(), currentPose.getY(), currentPose.getHeading(), false, telemetry, 0, false);
             } else {
                 // MANUAL SNAPS (GP2)
                 if (gamepad2.a) manualTargetDegrees = 90;
@@ -119,8 +107,8 @@ public class RedDriver extends LinearOpMode {
 
                 // 2. RECALIBRATION BUTTON COMBO (GP2)
                 // Start + Back is the standard safety combo
-                if (gamepad2.start && gamepad2.back) {
-                    follower.setPose(PoseStorage.getFailsafePose(RED_RESET));
+                if (gamepad2.y) {
+                    follower.setPose(new Pose(8,8,180));
                     gamepad2.rumble(300);
                 }
                 // Helpful Telemetry for the drivers
